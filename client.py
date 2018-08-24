@@ -1,6 +1,6 @@
 import threading
-from tkinter import *
-from tkinter import simpledialog
+import os 
+import time
 
 import grpc
 
@@ -13,32 +13,24 @@ port = 11912
 
 class Client:
 
-    def __init__(self, u: str, window):
+    def __init__(self, u: str):
         # the frame to put ui components on
-        self.window = window
         self.username = u
         # create a gRPC channel + stub
         channel = grpc.insecure_channel(address + ':' + str(port))
         self.conn = rpc.ChatServerStub(channel)
         # create new listening thread for when new message streams come in
-        threading.Thread(target=self.__listen_for_messages, daemon=True).start()
-        self.__setup_ui()
-        self.window.mainloop()
+        threading.Thread(target=self.__ListenForMessages, daemon=True).start()
 
-    def __listen_for_messages(self):
+    def __ListenForMessages(self):
         """
         This method will be ran in a separate thread as the main/ui thread, because the for-in call is blocking
         when waiting for new messages
         """
         for note in self.conn.ChatStream(chat.Empty()):
             print("R[{}] {}".format(note.name, note.message))
-            self.chat_list.insert(END, "[{}] {}\n".format(note.name, note.message))
 
-    def send_message(self, event):
-        """
-        This method is called when user enters something into the textbox
-        """
-        message = self.entry_message.get()
+    def SendMessage(self, message):
         if message is not '':
             n = chat.Note()
             n.name = self.username
@@ -46,24 +38,15 @@ class Client:
             print("S[{}] {}".format(n.name, n.message))
             self.conn.SendNote(n)
 
-    def __setup_ui(self):
-        self.chat_list = Text()
-        self.chat_list.pack(side=TOP)
-        self.lbl_username = Label(self.window, text=self.username)
-        self.lbl_username.pack(side=LEFT)
-        self.entry_message = Entry(self.window, bd=5)
-        self.entry_message.bind('<Return>', self.send_message)
-        self.entry_message.focus()
-        self.entry_message.pack(side=BOTTOM)
-
-
 if __name__ == '__main__':
-    root = Tk()
-    frame = Frame(root, width=300, height=300)
-    frame.pack()
-    root.withdraw()
     username = None
     while username is None:
-        username = simpledialog.askstring("Username", "What's your username?", parent=root)
-    root.deiconify()
-    c = Client(username, frame)
+        username = input("Enter your name: ") 
+    c = Client(username)
+    while True:
+        line = input("> ")
+        if line == "exit":
+            os.exit()
+        c.SendMessage(line)
+        time.sleep(0.02)
+

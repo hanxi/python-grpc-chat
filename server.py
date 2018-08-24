@@ -6,6 +6,7 @@ import time
 import proto.chat_pb2 as chat
 import proto.chat_pb2_grpc as rpc
 
+gConn = {}
 
 class ChatServer(rpc.ChatServerServicer):
 
@@ -31,6 +32,7 @@ class ChatServer(rpc.ChatServerServicer):
                 n = self.chats[lastindex]
                 lastindex += 1
                 yield n
+            time.sleep(0.02)
 
     def SendNote(self, request: chat.Note, context):
         """
@@ -43,6 +45,7 @@ class ChatServer(rpc.ChatServerServicer):
         print("[{}] {}".format(request.name, request.message))
         # Add it to the chat history
         self.chats.append(request)
+        gConn[request.name] = context
         return chat.Empty()
 
 
@@ -50,11 +53,19 @@ if __name__ == '__main__':
     port = 11912
     # create a gRPC server
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-    rpc.add_ChatServerServicer_to_server(ChatServer(), server)
+    servicer = ChatServer()
+    rpc.add_ChatServerServicer_to_server(servicer, server)
 
     print('Starting server. Listening...')
     server.add_insecure_port('[::]:' + str(port))
     server.start()
     # Server starts in background (another thread) so keep waiting
     while True:
-        time.sleep(64 * 64 * 100)
+        for name,context in gConn.items():
+            note = chat.Note()
+            note.name = "system"
+            note.message = "Hello every body."
+            servicer.chats.append(note)
+            servicer.ChatStream(None, context)
+        time.sleep(10)
+
